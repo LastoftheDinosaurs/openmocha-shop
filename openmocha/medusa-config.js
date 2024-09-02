@@ -29,7 +29,7 @@ const ADMIN_CORS = process.env.ADMIN_CORS || "http://localhost:7000,http://local
 // CORS to avoid issues when consuming Medusa from a client
 const STORE_CORS = process.env.STORE_CORS || "http://localhost:8000";
 
-const DATABASE_URL = process.env.DATABASE_URL || "postgres://medusa_admin:supersecretpassword@postgres:5432/medusa_store";
+const DATABASE_URL = process.env.DATABASE_URL || "postgres://medusa-admin:supersecretpassword@postgres:5432/medusa-store";
 const REDIS_URL = process.env.REDIS_URL || "redis://:supersecretpassword@redis:6379";
 
 const plugins = [
