@@ -1,0 +1,24 @@
+# Use the official Node.js image as a base
+FROM node:18-alpine
+
+# Set working directory inside the container
+WORKDIR /app
+
+# Copy package.json and yarn.lock to install dependencies
+COPY package.json yarn.lock ./
+
+# Install dependencies
+RUN yarn install
+
+# Copy the rest of the application code
+COPY . .
+
+# Build the storefront
+RUN yarn build
+
+# Expose the port that your Storefront service runs on
+EXPOSE 8000
+
+# Start the Storefront service
+CMD ["yarn", "start:prod"]
+

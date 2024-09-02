@@ -1,58 +1,92 @@
 # This is the shell.nix file for setting up a Node.js development environment with MedusaJS.
-# It includes the necessary dependencies like Node.js, Yarn, PostgreSQL, Redis, and Docker.
+# It includes the necessary dependencies like Node.js, Yarn, PostgreSQL, Redis, and Podman.
 
 { pkgs ? import <nixpkgs> {} }:
 
 let
-  # Define the directory where the docker-compose.yml is located
-  projectDir = "/etc/nixos/shells/medusajs";
 
-in pkgs.mkShell {
-  # Define the build inputs needed for the development environment.
-  buildInputs = [
-    pkgs.nodejs-18_x  # Node.js 18.x for running the Medusa server
-    pkgs.yarn         # Yarn package manager
-    pkgs.postgresql   # PostgreSQL for the database
-    pkgs.redis        # Redis for event queues
-    pkgs.vscodium     # VS Codium as the editor
-    pkgs.docker       # Docker for containerized services
-    pkgs.docker-compose # Docker Compose for managing multi-container Docker applications
-    pkgs.socat        # socat is required for rootless Docker mode
-  ];
+  # To use this shell.nix on NixOS your user needs to be configured as such:
+  # users.extraUsers.adisbladis = {
+  #   subUidRanges = [{ startUid = 100000; count = 65536; }];
+  #   subGidRanges = [{ startGid = 100000; count = 65536; }];
+  # };
 
-  # The shellHook runs when you enter the shell.
-  shellHook = ''
-    echo "Welcome to the MedusaJS development environment!";
+  # Provides a script that copies required files to ~/
+  podmanSetupScript = let
+    registriesConf = pkgs.writeText "registries.conf" ''
+      [registries.search]
+      registries = ['docker.io']
 
-    # Ensure Docker daemon is running in rootless mode
-    if ! pgrep -x "dockerd" > /dev/null; then
-      echo "Starting Docker daemon in rootless mode..."
-      dockerd-rootless.sh &
-      sleep 5  # Give the Docker daemon a moment to start
+      [registries.block]
+      registries = []
+    '';
+  in pkgs.writeScript "podman-setup" ''
+    #!${pkgs.runtimeShell}
+
+    # Ensure necessary configuration files are present
+    if ! test -f ~/.config/containers/policy.json; then
+      install -Dm555 ${pkgs.skopeo.src}/default-policy.json ~/.config/containers/policy.json
     fi
 
-    # Start Docker Compose using the correct directory
-    if [ -f ${projectDir}/docker-compose.yml ]; then
-      echo "Starting Docker Compose services..."
-      docker-compose -f ${projectDir}/docker-compose.yml up -d
+    if ! test -f ~/.config/containers/registries.conf; then
+      install -Dm555 ${registriesConf} ~/.config/containers/registries.conf
+    fi
+  '';
+
+  # Provides a fake "docker" binary mapping to podman
+  dockerCompat = pkgs.runCommandNoCC "docker-podman-compat" {} ''
+    mkdir -p $out/bin
+    ln -s ${pkgs.podman}/bin/podman $out/bin/docker
+  '';
+
+in pkgs.mkShell {
+
+  buildInputs = [
+    dockerCompat            # Compatibility layer to use Podman as Docker
+    pkgs.medusa             # MedusaJS CLI and dependencies
+    pkgs.vault-medusa       # Medusa Vault plugin for secure storage
+    pkgs.podman             # Podman for managing containers
+    pkgs.runc               # Container runtime for Podman
+    pkgs.conmon             # Container monitor for Podman
+    pkgs.skopeo             # Tool for interacting with container registries
+    pkgs.slirp4netns        # User-mode networking for rootless containers
+    pkgs.fuse-overlayfs     # Overlay filesystem support for Podman
+    pkgs.nodejs-18_x        # Node.js 18.x for running the Medusa server
+    pkgs.yarn               # Yarn package manager
+    pkgs.postgresql         # PostgreSQL for the database
+    pkgs.redis              # Redis for event queues
+  ];
+
+  shellHook = ''
+    # Install required Podman configuration
+    ${podmanSetupScript}
+
+    echo "Welcome to the MedusaJS development environment!";
+
+    # Ensure Podman socket is available
+    if [ ! -S /run/podman/podman.sock ]; then
+      echo "Podman socket not found. Starting Podman socket...";
+      podman system service --time=0 &
+      sleep 5  # Give the Podman service a moment to start
+    fi
+
+    # Start Podman Compose using the correct directory
+    if [ -f /etc/nixos/shells/medusajs/docker-compose.yml ]; then
+      echo "Starting Podman Compose services...";
+      podman-compose -f /etc/nixos/shells/medusajs/docker-compose.yml up -d
     fi
 
     export NODE_ENV="development";
   '';
 
-  # The exitHook runs when you leave the shell.
   exitHook = ''
-    # Stop Docker Compose using the correct directory
-    if [ -f ${projectDir}/docker-compose.yml]; then
-      echo "Stopping Docker Compose services...";
-      docker-compose -f ${projectDir}/docker-compose.yml down
+    # Stop Podman Compose using the correct directory
+    if [ -f /etc/nixos/shells/medusajs/docker-compose.yml ]; then
+      echo "Stopping Podman Compose services...";
+      podman-compose -f /etc/nixos/shells/medusajs/docker-compose.yml down
     fi
 
-    # Stop Docker daemon if it was started by this shell
-    if pgrep -x "dockerd-rootless" > /dev/null; then
-      echo "Stopping Docker daemon..."
-      pkill dockerd-rootless.sh
-    fi
+    # Podman socket is managed by Podman itself; no need to stop it manually
   '';
 }
 
