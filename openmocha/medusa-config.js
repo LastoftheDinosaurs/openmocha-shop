@@ -19,19 +19,18 @@ switch (process.env.NODE_ENV) {
 
 try {
   dotenv.config({ path: process.cwd() + "/" + ENV_FILE_NAME });
-} catch (e) {}
+} catch (e) {
+  console.error(`Failed to load ${ENV_FILE_NAME} file. Error:`, e);
+}
 
 // CORS when consuming Medusa from admin
-const ADMIN_CORS =
-  process.env.ADMIN_CORS || "http://localhost:7000,http://localhost:7001";
+const ADMIN_CORS = process.env.ADMIN_CORS || "http://localhost:7000,http://localhost:7001";
 
 // CORS to avoid issues when consuming Medusa from a client
 const STORE_CORS = process.env.STORE_CORS || "http://localhost:8000";
 
-const DATABASE_URL =
-  process.env.DATABASE_URL || "postgres://localhost/medusa-starter-default";
-
-const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
+const DATABASE_URL = process.env.DATABASE_URL || "postgres://medusa_admin:supersecretpassword@postgres:5432/medusa_store";
+const REDIS_URL = process.env.REDIS_URL || "redis://:supersecretpassword@redis:6379";
 
 const plugins = [
   `medusa-fulfillment-manual`,
@@ -55,7 +54,7 @@ const plugins = [
 ];
 
 const modules = {
-  /*eventBus: {
+  eventBus: {
     resolve: "@medusajs/event-bus-redis",
     options: {
       redisUrl: REDIS_URL
@@ -66,18 +65,17 @@ const modules = {
     options: {
       redisUrl: REDIS_URL
     }
-  },*/
+  },
 };
 
 /** @type {import('@medusajs/medusa').ConfigModule["projectConfig"]} */
 const projectConfig = {
-  jwt_secret: process.env.JWT_SECRET || "supersecret",
-  cookie_secret: process.env.COOKIE_SECRET || "supersecret",
+  jwt_secret: process.env.JWT_SECRET || "some_jwt_secret",
+  cookie_secret: process.env.COOKIE_SECRET || "some_cookie_secret",
   store_cors: STORE_CORS,
   database_url: DATABASE_URL,
   admin_cors: ADMIN_CORS,
-  // Uncomment the following lines to enable REDIS
-  // redis_url: REDIS_URL
+  redis_url: REDIS_URL
 };
 
 /** @type {import('@medusajs/medusa').ConfigModule} */
@@ -86,3 +84,4 @@ module.exports = {
   plugins,
   modules,
 };
+

@@ -1,0 +1,21 @@
+services:
+  admin:
+    build:
+      context: ./openmocha
+      dockerfile: Dockerfile.admin
+    container_name: medusa-admin
+    ports:
+      - "7001:80"
+    depends_on:
+      - backend
+
+  storefront:
+    build:
+      context: ./openmocha-storefront
+      dockerfile: Dockerfile.prod
+    container_name: medusa-storefront
+    ports:
+      - "8000:8000"
+    depends_on:
+      - backend
+
