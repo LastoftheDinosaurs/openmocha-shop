@@ -42,6 +42,9 @@ const plugins = [
     },
   },
   {
+    resolve: `medusa-plugin-wishlist`,
+  },
+  {
     resolve: "@medusajs/admin",
     /** @type {import('@medusajs/admin').PluginOptions} */
     options: {
